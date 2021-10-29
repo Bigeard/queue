@@ -1,4 +1,6 @@
-const { fork } = require('child_process');
+#!/usr/bin/env node
+const amqp = require('amqplib/callback_api');
+
 const accounts  = require('./accounts.json');
 const {
     v4: uuidv4,
@@ -6,22 +8,32 @@ const {
 
 
 let delay = process.argv[2] || 100
-let agent = fork('agent');
 async function start(){
-    setInterval(async () => {
-        let isCorrupted = Math.random() < 0.1;
-        let accountIndex = Math.floor(Math.random() * 99)
-        let transaction = {
-            account_num :accounts[accountIndex].account_id,
-            timestamp : Date.now(),
-            transactionId : uuidv4(),
-            amount : isCorrupted ? -1 : Math.floor(Math.random() * (10000 +2 +1)) -2
+    amqp.connect('amqp://localhost', function(error0, connection) {
+        if (error0) {
+            throw error0;
         }
-        console.log(`[EMITTER] Transaction n°${transaction.transactionId} (${transaction.amount}€) envoyée`);
+        connection.createChannel(function(error1, channel) {
+            if (error1) {
+                throw error1;
+            }
+            const queue = 'transaction';
+            channel.assertQueue(queue, { durable: false });
+            setInterval(async () => {
+                let isCorrupted = Math.random() < 0.1;
+                let accountIndex = Math.floor(Math.random() * 99)
+                let transaction = {
+                    account_num :accounts[accountIndex].account_id,
+                    timestamp : Date.now(),
+                    transactionId : uuidv4(),
+                    amount : isCorrupted ? -1 : Math.floor(Math.random() * (10000 +2 +1)) -2
+                }
+                console.log(`[EMITTER] Transaction n°${transaction.transactionId} (${transaction.amount}€) envoyée`);
+                channel.sendToQueue(queue, Buffer.from(JSON.stringify(transaction)));
+            }, delay)
+        });
+    });
 
-        // Appel de l'agent pour le traitement de la transaction
-        agent.send(JSON.stringify(transaction))
-    } , delay)
 }
 
 start();
