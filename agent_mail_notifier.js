@@ -15,6 +15,7 @@ amqp.connect('amqp://localhost', function(error0, connection) {
     channel.assertExchange(exchange, 'fanout', {
       durable: false
     });
+    channel.prefetch(1);
 
     channel.assertQueue('', {
       exclusive: true
@@ -26,8 +27,12 @@ amqp.connect('amqp://localhost', function(error0, connection) {
       channel.bindQueue(q.queue, exchange, '');
       channel.consume(q.queue, function(msg) {
         if(msg.content) {
-            console.log(" [x] %s", msg.content.toString());
-          }
+          channel.ack(msg);
+          console.log(" [x] %s", msg.content.toString());
+        } else {
+          console.log(" [x] ERROR", msg);
+          channel.nack(msg, false, false);
+        }
       }, {
         noAck: true
       });

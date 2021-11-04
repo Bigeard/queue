@@ -15,15 +15,19 @@ amqp.connect('amqp://localhost', function(error0, connection) {
         channel.assertQueue(queue, {
             durable: false
         });
+        channel.prefetch(1);
         console.log(" [*] Waiting for messages in %s. To exit press CTRL+C", queue);
         channel.consume(queue, function(msg) {
             let transaction = JSON.parse(msg.content.toString());
             if(transaction.amount > 0) {
-                // channel.ack(msg)
+                channel.ack(msg);
                 setTimeout(() => {
-                    console.log(`[AGENT] Transaction n° ${transaction.transactionId} traitée avec succès, ${transaction.amount}`)
-                    send_message(channel, transaction)
+                    console.log(`[AGENT] Transaction n° ${transaction.transactionId} traitée avec succès, ${transaction.amount}`);
+                    send_message(channel, transaction);
                 } , 3000)
+            } else {
+                console.log(`[AGENT] Transaction n° ${transaction.transactionId} ERROR, ${transaction.amount}`);
+                channel.nack(msg, false, false);
             }
         }, {
             noAck: true
